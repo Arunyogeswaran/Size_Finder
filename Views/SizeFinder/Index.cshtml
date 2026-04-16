@@ -1,0 +1,247 @@
+﻿@model Size_Finder.Models.SizeFinderModel
+@{
+    ViewData["Title"] = "Men's Size Finder";
+}
+
+<style>
+    body { font-family: Arial, sans-serif; max-width: 650px; margin: 40px auto; padding: 20px; background: #f5f5f5; }
+    h2 { text-align: center; color: #222; }
+    .section { background: white; border-radius: 10px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    label { font-weight: bold; display: block; margin-top: 12px; }
+    input, select { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; box-sizing: border-box; }
+    .btn { width: 100%; padding: 14px; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; margin-top: 10px; }
+    .btn-primary { background: #e63946; color: white; }
+    .btn-primary:hover { background: #c1121f; }
+    .btn-secondary { background: #222; color: white; }
+    .btn-secondary:hover { background: #444; }
+    .btn-green { background: #2e7d32; color: white; }
+    .btn-green:hover { background: #1b5e20; }
+    .result { background: #e8f5e9; border-left: 5px solid #2e7d32; padding: 20px; border-radius: 8px; margin-top: 20px; }
+    .result h3 { color: #2e7d32; }
+    .size-badge { font-size: 52px; font-weight: bold; color: #e63946; display: block; text-align: center; margin: 10px 0; }
+    .shopify-info { background: #fff3e0; border-left: 5px solid #f57c00; padding: 15px; border-radius: 8px; margin-top: 15px; }
+    .unit-toggle { display: flex; gap: 10px; margin-top: 10px; }
+    .unit-toggle label { font-weight: normal; display: flex; align-items: center; gap: 5px; cursor: pointer; }
+    .conversion-box { display: none; margin-top: 15px; background: #f0f4ff; padding: 10px; border-radius: 6px; font-size: 13px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+    th { background: #222; color: white; }
+    tr:nth-child(even) { background: #f9f9f9; }
+    .highlight-row { background: #ffe0e0 !important; font-weight: bold; }
+</style>
+
+<h2>👕 Men's Size Finder</h2>
+
+<form asp-controller="SizeFinder" asp-action="Index" method="post" id="sizeForm">
+
+    <!-- Unit Toggle -->
+    <div class="section">
+        <h3>📐 Select Measurement Unit</h3>
+        <div class="unit-toggle">
+            <label>
+                <input type="radio" asp-for="Unit" value="inches"
+                       onchange="updateLabels('inches')" checked /> Inches (in)
+            </label>
+            <label>
+                <input type="radio" asp-for="Unit" value="cm"
+                       onchange="updateLabels('cm')" /> Centimeters (cm)
+            </label>
+        </div>
+    </div>
+
+    <!-- Measurements -->
+    <div class="section">
+        <h3>📏 Step 1: Your Measurements</h3>
+
+        <label>Chest Size (<span id="unitLabel1">in</span>)</label>
+        <input asp-for="Chest" type="number" step="0.5" id="chestInput"
+               placeholder="e.g. 38" required />
+
+        <label>Waist Size (<span id="unitLabel2">in</span>)</label>
+        <input asp-for="Waist" type="number" step="0.5" id="waistInput"
+               placeholder="e.g. 32" required />
+
+        <label>Hips Size (<span id="unitLabel3">in</span>)</label>
+        <input asp-for="Hips" type="number" step="0.5" id="hipsInput"
+               placeholder="e.g. 36" required />
+
+        <label>Height (cm)</label>
+        <input asp-for="Height" type="number" step="1"
+               placeholder="e.g. 175" required />
+
+        <!-- Live Conversion -->
+        <div class="conversion-box" id="conversionBox">
+            <strong>📊 Converted Values:</strong>
+            <span id="conversionText"></span>
+        </div>
+    </div>
+
+    <!-- Quiz -->
+    <div class="section">
+        <h3>🧩 Step 2: Quick Quiz</h3>
+
+        <label>Body Build Type</label>
+        <select asp-for="BuildType" required>
+            <option value="">-- Select Build --</option>
+            <option value="Slim">Slim</option>
+            <option value="Regular">Regular</option>
+            <option value="Athletic">Athletic</option>
+            <option value="Heavy">Heavy</option>
+        </select>
+
+        <label>Fit Preference</label>
+        <select asp-for="FitPreference" required>
+            <option value="">-- Select Fit --</option>
+            <option value="Tight">Tight / Form Fitting</option>
+            <option value="Regular">Regular Fit</option>
+            <option value="Loose">Loose / Relaxed Fit</option>
+        </select>
+    </div>
+
+    <!-- Shopify -->
+    <div class="section">
+        <h3>🛒 Step 3: Shopify Product (Optional)</h3>
+        <p style="font-size:13px; color:#666;">
+            Enter a Shopify Product ID to check stock availability.
+        </p>
+        <label>Shopify Product ID</label>
+        <input asp-for="ShopifyProductId" type="text"
+               placeholder="e.g. 7891234567890" />
+    </div>
+
+    <button type="submit" class="btn btn-primary">🔍 Find My Size</button>
+</form>
+
+<!-- Result -->
+@if (!string.IsNullOrEmpty(Model.RecommendedSize))
+{
+    <div class="result">
+        <h3>✅ Your Recommended Size</h3>
+        <span class="size-badge">@Model.RecommendedSize</span>
+        <p>@Model.FitNote</p>
+
+        @if (!string.IsNullOrEmpty(Model.ShopifyVariantInfo))
+        {
+            <div class="shopify-info">
+                <strong>🛒 Shopify Stock Info:</strong><br />
+                @Model.ShopifyVariantInfo
+            </div>
+        }
+
+        <!-- PDF Export -->
+        <form asp-controller="SizeFinder" asp-action="ExportPdf" method="post" style="margin-top:15px;">
+            <input type="hidden" name="Chest" value="@Model.Chest" />
+            <input type="hidden" name="Waist" value="@Model.Waist" />
+            <input type="hidden" name="Hips" value="@Model.Hips" />
+            <input type="hidden" name="Height" value="@Model.Height" />
+            <input type="hidden" name="Unit" value="@Model.Unit" />
+            <input type="hidden" name="BuildType" value="@Model.BuildType" />
+            <input type="hidden" name="FitPreference" value="@Model.FitPreference" />
+            <button type="submit" class="btn btn-secondary">
+                📄 Download PDF Size Guide
+            </button>
+        </form>
+
+        <!-- Add to Cart -->
+        <button class="btn btn-green" style="margin-top:10px;" onclick="addToCart()">
+            🛒 Add This Size to Cart
+        </button>
+    </div>
+}
+
+<!-- Size Chart -->
+<div class="section" style="margin-top:20px;">
+    <h3>📊 Men's Size Chart</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Size</th>
+                <th>Chest (in)</th>
+                <th>Waist (in)</th>
+                <th>Hips (in)</th>
+                <th>Chest (cm)</th>
+                <th>Waist (cm)</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var row in new[]
+            {
+            new[]{"XS",  "32-34","26-28","32-34","81-86",  "66-71"},
+            new[]{"S",   "34-36","28-30","34-36","86-91",  "71-76"},
+            new[]{"M",   "36-38","30-32","36-38","91-97",  "76-81"},
+            new[]{"L",   "38-40","32-34","38-40","97-102", "81-86"},
+            new[]{"XL",  "40-42","34-36","40-42","102-107","86-91"},
+            new[]{"XXL", "42-44","36-38","42-44","107-112","91-97"},
+            new[]{"3XL", "44+",  "38+",  "44+",  "112+",  "97+"  },
+            })
+            {
+                <tr class="@(row[0] == Model.RecommendedSize ? "highlight-row" : "")">
+                    @foreach (var cell in row)
+                    {
+                        <td>@cell</td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<script>
+    function updateLabels(unit) {
+        const label = unit === "cm" ? "cm" : "in";
+        document.getElementById("unitLabel1").textContent = label;
+        document.getElementById("unitLabel2").textContent = label;
+        document.getElementById("unitLabel3").textContent = label;
+        updateConversion();
+    }
+
+    function updateConversion() {
+        const unit  = document.querySelector('input[name="Unit"]:checked')?.value;
+        const chest = parseFloat(document.getElementById("chestInput").value);
+        const waist = parseFloat(document.getElementById("waistInput").value);
+        const hips  = parseFloat(document.getElementById("hipsInput").value);
+
+        if (!chest || !waist || !hips) return;
+
+        const box  = document.getElementById("conversionBox");
+        const text = document.getElementById("conversionText");
+        box.style.display = "block";
+
+        if (unit === "cm") {
+            text.innerHTML = ` Chest: ${(chest / 2.54).toFixed(1)}" |
+                               Waist: ${(waist / 2.54).toFixed(1)}" |
+                               Hips: ${(hips  / 2.54).toFixed(1)}"`;
+        } else {
+            text.innerHTML = ` Chest: ${(chest * 2.54).toFixed(1)} cm |
+                               Waist: ${(waist * 2.54).toFixed(1)} cm |
+                               Hips: ${(hips  * 2.54).toFixed(1)} cm`;
+        }
+    }
+
+    ["chestInput", "waistInput", "hipsInput"].forEach(id => {
+        document.getElementById(id)?.addEventListener("input", updateConversion);
+    });
+
+    function addToCart() {
+        const info      = "@Model.ShopifyVariantInfo";
+        const match     = info.match(/Variant ID: (\d+)/);
+        const variantId = match ? match[1] : null;
+
+        if (!variantId) {
+            alert("Please enter a Shopify Product ID and find your size first.");
+            return;
+        }
+
+        fetch("/cart/add.js", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: variantId, quantity: 1 })
+        })
+        .then(r => r.json())
+        .then(() => {
+            alert("✅ Added to cart! Redirecting...");
+            window.location.href = "/cart";
+        })
+        .catch(() => alert("❌ Could not add to cart. Please try manually."));
+    }
+</script>

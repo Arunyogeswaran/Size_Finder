@@ -1,0 +1,3 @@
+﻿<Project>
+  <Import Project="..\build\Size_Finder.props" />
+</Project>
